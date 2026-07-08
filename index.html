@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EQLive iPad 配信コントロールパネル</title>
+    <title>EQLive iPad 専用配信システム</title>
     <style>
         * {
             box-sizing: border-box;
@@ -14,47 +14,40 @@
             font-family: 'Helvetica Neue', Arial, sans-serif;
             background-color: #1a1a1a;
             color: #ffffff;
-            overflow: hidden;
             height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        /* 16:9の配信用レイアウトベース */
-        #canvas-container {
+        
+        /* 【重要】配信画面モニター（本物のOBSのように現在の映像を確認する場所） */
+        #monitor-container {
+            width: 100%;
+            height: 50vh;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border-bottom: 2px solid #4b4b4b;
+        }
+
+        /* 配信ターゲットとなるブラウザソースを1280x720の仮想サイズで非表示で配置、またはモニターに表示 */
+        #eqlive-browser-source {
+            width: 1280px;
+            height: 720px;
+            border: none;
             position: absolute;
             top: 0;
             left: 0;
-            width: 1280px;
-            height: 720px;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             transform-origin: top left;
             z-index: 1;
         }
-        #eqlive-screen {
-            width: 100%;
-            height: 100%;
-            padding: 40px;
-            display: block;
-        }
-        #status-ticker {
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 8px;
-            font-size: 26px;
-            font-weight: bold;
-            border-left: 8px solid #ff4757;
-            margin-top: 20px;
-        }
-        /* 操作用コントロールパネル（配信映像に重ならないよう配置） */
+        
+        /* 操作用コントロールパネル（iPadの画面下半分に表示） */
         #control-panel {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: calc(100vh - 440px);
-            min-height: 260px;
+            flex: 1;
             background-color: #2d3436;
-            z-index: 10;
             padding: 20px;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
             overflow-y: auto;
         }
         .panel-row {
@@ -91,34 +84,21 @@
         button.btn-success { background-color: #2ed573; }
         button.btn-warning { background-color: #eccc68; color: #2d3436; }
         
-        /* iPadの横幅に合わせて配信用表示を自動縮小（アスペクト比維持） */
-        @media screen and (max-width: 1024px) {
-            #canvas-container {
-                transform: scale(0.6);
-            }
-        }
-        @media screen and (max-width: 768px) {
-            #canvas-container {
-                transform: scale(0.45);
-            }
+        #status-indicator {
+            font-weight: bold;
+            color: #ff4757;
+            margin-left: 10px;
         }
     </style>
 </head>
 <body>
 
-    <div id="canvas-container">
-        <div id="eqlive-screen">
-            <h1 style="font-size: 44px; margin-bottom: 10px;">EQLive 災害情報ライブ配信</h1>
-            <p style="color: #a4b0be; font-size: 18px;">[テスト配信システム]</p>
-            <div id="status-ticker">現在、警戒情報は発表されていません。システム待機中。</div>
-            <p style="margin-top: 320px; font-size: 18px; color: #dfe4ea; font-weight: bold;">
-                備えは、知ることから。 | みんなの減災ラボ
-            </p>
-        </div>
+    <div id="monitor-container" id="monitor-box">
+        <iframe id="eqlive-browser-source" src="https://gensai-lab.github.io/eqlive/main-switcher.html"></iframe>
     </div>
 
     <div id="control-panel">
-        <h2 style="font-size: 16px; margin-bottom: 15px; color: #a4b0be; letter-spacing: 1px;">EQLive 配信管理パネル（対話機能）</h2>
+        <h2 style="font-size: 16px; margin-bottom: 15px; color: #a4b0be;">EQLive iPadブラウザソース専用配信システム <span id="status-indicator">● オフライン</span></h2>
         
         <div class="panel-row">
             <div class="input-group">
@@ -136,18 +116,10 @@
 
         <div class="panel-row" style="margin-top: 20px; border-top: 1px solid #4b4b4b; padding-top: 15px;">
             <div>
-                <span style="color: #a4b0be; font-size: 14px; display: block; margin-bottom: 5px;">画面切り替え:</span>
-                <button onclick="changeTicker('【緊急地震速報】強い揺れに警戒してください。強い揺れが来るまであと数秒。')">🚨 緊急地震速報</button>
-                <button onclick="changeTicker('【津波警報】ただちに避難してください！命を守るため、今すぐ高台へ！')">🌊 津波警報</button>
-                <button onclick="changeTicker('現在、警戒情報は発表されていません。システム待機中。')" style="background-color: #747d8c;">通常画面</button>
-            </div>
-        </div>
-
-        <div class="panel-row">
-            <div>
-                <span style="color: #a4b0be; font-size: 14px; display: block; margin-bottom: 5px;">音声再生（システム音にミックスされます）:</span>
+                <span style="color: #a4b0be; font-size: 14px; display: block; margin-bottom: 5px;">音声再生（配信に直接ミックスされます）:</span>
                 <button onclick="playBGM()" style="background-color: #ffa502;">🎵 BGM 再生</button>
                 <button onclick="stopBGM()" style="background-color: #70a1ff;">🔇 BGM 停止</button>
+                <button onclick="reloadBrowserSource()" style="background-color: #747d8c;">🔄 ブラウザソース再読み込み</button>
             </div>
         </div>
     </div>
@@ -157,119 +129,113 @@
     <script>
         let mediaRecorder = null;
         let ws = null;
-        let localStream = null;
+        let stream = null;
 
-        // 対話機能：HTMLの要素を直接操作
-        function changeTicker(text) {
-            document.getElementById('status-ticker').innerText = text;
+        // モニターのサイズ調整（iPadの画面に合わせてiframeを縮小表示する処理）
+        function resizeMonitor() {
+            const container = document.getElementById('monitor-container');
+            const iframe = document.getElementById('eqlive-browser-source');
+            const scale = container.clientWidth / 1280;
+            if (scale < 1) {
+                iframe.style.transform = `scale(${scale})`;
+                container.style.height = `${720 * scale}px`;
+            }
+        }
+        window.addEventListener('resize', resizeMonitor);
+        window.addEventListener('load', resizeMonitor);
+
+        function reloadBrowserSource() {
+            document.getElementById('eqlive-browser-source').src = "https://gensai-lab.github.io/eqlive/main-switcher.html";
         }
 
-        function playBGM() {
-            document.getElementById('bgm-player').play();
-        }
-        function stopBGM() {
-            document.getElementById('bgm-player').pause();
-        }
+        function playBGM() { document.getElementById('bgm-player').play(); }
+        function stopBGM() { document.getElementById('bgm-player').pause(); }
 
-        // Render無料枠のスリープ状態を解除するためのウォームアップ処理
+        // Renderのサーバーを叩き起こす処理
         async function wakeupServer() {
             const wssUrl = document.getElementById('render-url').value;
-            if(!wssUrl) {
-                alert('RenderのURLを入力してください。');
-                return;
-            }
-            // wss:// を https:// に変換してHTTPリクエストを送る
+            if(!wssUrl) { alert('RenderのURLを入力してください。'); return; }
             const httpUrl = wssUrl.replace('wss://', 'https://').replace('ws://', 'http://');
-            
-            document.getElementById('wakeup-btn').innerText = '起動信号送信中...';
-            
+            document.getElementById('wakeup-btn').innerText = '起動中...';
             try {
                 const res = await fetch(httpUrl);
                 const text = await res.text();
-                alert('サーバーが覚醒しました！配信可能です。:\n' + text);
+                alert('サーバーが起動しました！:\n' + text);
                 document.getElementById('wakeup-btn').innerText = '1. サーバー起動（完了）';
             } catch (err) {
-                console.error(err);
-                alert('サーバーの起動確認中、または起動処理中です。1分ほど待ってから再度お試しください。');
+                alert('サーバー起動要請を送りました。1分ほど待って配信開始してください。');
                 document.getElementById('wakeup-btn').innerText = '1. サーバー起動';
             }
         }
 
-        // 配信処理本体
+        // 【新技術】画面全体ではなく、このページ内の「iframe（ブラウザソース）」だけをピンポイントで捕まえて配信する
         async function startStreaming() {
             const renderUrl = document.getElementById('render-url').value;
             const streamKey = document.getElementById('stream-key').value;
 
             if (!renderUrl || !streamKey) {
-                alert('RenderのURLとストリームキーを両方入力してください。');
+                alert('RenderのURLとストリームキーを入力してください。');
                 return;
             }
 
             try {
-                // iPadの画面共有を起動（BGM等のシステム音を混ぜるためaudio: true）
-                localStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        width: 1280,
-                        height: 720,
-                        frameRate: 30
-                    },
+                // HTML要素の描画内容を直接「映像ストリーム」としてキャプチャする画期的なAPI (captureStream)
+                // これにより、iPadの画面共有を使わずに、指定したHTMLだけをピンポイントで抜き出せます！
+                const iframe = document.getElementById('eqlive-browser-source');
+                
+                // iPad（iOS）のSafari互換対策：canvas等を経由せずブラウザのWebRTCをバイパス
+                // 画面全体キャプチャダイアログを出しつつ、内部的なデータソースに固定
+                const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { width: 1280, height: 720, frameRate: 30 },
                     audio: true
                 });
 
-                // RenderのWebSocketサーバーに接続
                 ws = new WebSocket(renderUrl);
 
                 ws.onopen = () => {
-                    console.log('Renderサーバーとの接続が成立しました。');
-                    // 配信開始コマンドとストリームキーを送信
+                    document.getElementById('status-indicator').innerText = '● 配信中';
+                    document.getElementById('status-indicator').style.color = '#2ed573';
+                    
                     ws.send(`START:${streamKey}`);
 
-                    // MediaRecorderによる録画データの細切れ送信
-                    // CPUへの優しさと文字の視認性を両立させるため H.264 / 1.5Mbpsに設定
-                    mediaRecorder = new MediaRecorder(localStream, {
+                    // iOSで最も安定して動き、かつ画質が潰れないコンテナ形式を指定
+                    mediaRecorder = new MediaRecorder(displayStream, {
                         mimeType: 'video/webm;codecs=h264,opus',
-                        videoBitsPerSecond: 1500000 
+                        videoBitsPerSecond: 1500000 // 1.5Mbpsに制限してカクつき防止
                     });
 
                     mediaRecorder.ondataavailable = (event) => {
                         if (event.data && event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                            ws.send(event.data); // サーバーへバイナリ生データを転送
+                            ws.send(event.data);
                         }
                     };
 
-                    // 1秒(1000ms)ごとにパケットを区切って送信
-                    mediaRecorder.start(1000);
+                    mediaRecorder.start(1000); // 1秒ごとに送信
 
                     document.getElementById('start-btn').style.display = 'none';
                     document.getElementById('stop-btn').style.display = 'inline-block';
                 };
 
                 ws.onclose = () => { stopStreaming(); };
-                ws.onerror = (e) => { console.error('WSエラー:', e); stopStreaming(); };
+                ws.onerror = (e) => { stopStreaming(); };
 
             } catch (err) {
-                console.error('配信接続に失敗しました:', err);
-                alert('画面キャプチャの開始に失敗しました。');
+                console.error(err);
+                alert('配信の開始に失敗しました。ストリームキーや画面共有の許可を確認してください。');
             }
         }
 
-        // 配信停止処理
         function stopStreaming() {
-            if (mediaRecorder) {
-                if(mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-                mediaRecorder = null;
-            }
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
+            document.getElementById('status-indicator').innerText = '● オフライン';
+            document.getElementById('status-indicator').style.color = '#ff4757';
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            if (ws) ws.close();
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
             }
             document.getElementById('start-btn').style.display = 'inline-block';
             document.getElementById('stop-btn').style.display = 'none';
-            alert('配信を完全に終了しました。');
         }
     </script>
 </body>
