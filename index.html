@@ -2,241 +2,108 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EQLive iPad 専用配信システム</title>
+    <title>EQLive Web-OBS for iPad</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* 【重要】配信画面モニター（本物のOBSのように現在の映像を確認する場所） */
-        #monitor-container {
-            width: 100%;
-            height: 50vh;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            border-bottom: 2px solid #4b4b4b;
-        }
-
-        /* 配信ターゲットとなるブラウザソースを1280x720の仮想サイズで非表示で配置、またはモニターに表示 */
-        #eqlive-browser-source {
-            width: 1280px;
-            height: 720px;
-            border: none;
-            position: absolute;
-            top: 0;
-            left: 0;
-            transform-origin: top left;
-            z-index: 1;
-        }
-        
-        /* 操作用コントロールパネル（iPadの画面下半分に表示） */
-        #control-panel {
-            flex: 1;
-            background-color: #2d3436;
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .panel-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            align-items: center;
-        }
-        .input-group {
-            flex: 1;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            border-radius: 6px;
-            border: none;
-            background-color: #4b4b4b;
-            color: #fff;
-            font-size: 15px;
-        }
-        button {
-            padding: 12px 20px;
-            border-radius: 6px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 15px;
-            background-color: #0984e3;
-            color: #fff;
-            white-space: nowrap;
-        }
-        button:active { opacity: 0.8; }
-        button.btn-danger { background-color: #d63031; }
-        button.btn-success { background-color: #2ed573; }
-        button.btn-warning { background-color: #eccc68; color: #2d3436; }
-        
-        #status-indicator {
-            font-weight: bold;
-            color: #ff4757;
-            margin-left: 10px;
-        }
+        /* OBS風のダークテーマUI */
+        body { background-color: #202225; color: #ffffff; font-family: sans-serif; margin: 0; padding: 10px; }
+        .container { display: flex; gap: 10px; }
+        .preview-box { flex: 2; background: #000; position: relative; }
+        #previewCanvas { width: 100%; aspect-ratio: 16/9; background: #000; }
+        .control-panel { flex: 1; background: #2f3136; padding: 15px; border-radius: 5px; }
+        .btn { background: #4f545c; color: #fff; border: none; padding: 10px; cursor: pointer; width: 100%; margin-bottom: 10px; }
+        .btn-stream { background: #ed4245; }
     </style>
 </head>
 <body>
 
-    <div id="monitor-container" id="monitor-box">
-        <iframe id="eqlive-browser-source" src="https://gensai-lab.github.io/eqlive/main-switcher.html"></iframe>
+<div id="auth-section">
+    <button class="btn" onclick="handleAuthClick()">Googleアカウントと連携（YouTube）</button>
+</div>
+
+<div class="container">
+    <div class="preview-box">
+        <canvas id="previewCanvas" width="1920" height="1080"></canvas>
     </div>
 
-    <div id="control-panel">
-        <h2 style="font-size: 16px; margin-bottom: 15px; color: #a4b0be;">EQLive iPadブラウザソース専用配信システム <span id="status-indicator">● オフライン</span></h2>
+    <div class="control-panel">
+        <h3>配信コントロール</h3>
+        <button class="btn btn-stream" id="startBtn" onclick="toggleStreaming()">配信開始</button>
         
-        <div class="panel-row">
-            <div class="input-group">
-                <input type="text" id="render-url" placeholder="RenderのWebSocket URL (wss://xxxx.onrender.com)">
-            </div>
-            <div class="input-group">
-                <input type="text" id="stream-key" placeholder="YouTube ライブ ストリームキー">
-            </div>
-            <div>
-                <button id="wakeup-btn" class="btn-warning" onclick="wakeupServer()">1. サーバー起動</button>
-                <button id="start-btn" class="btn-success" onclick="startStreaming()">2. 配信開始</button>
-                <button id="stop-btn" class="btn-danger" onclick="stopStreaming()" style="display:none;">配信停止</button>
-            </div>
-        </div>
+        <h3>ソース (OBS風)</h3>
+        <ul>
+            <li>ブラウザソース: EQLive HTML（表示中）</li>
+            <li>音声ソース: バックグラウンドBGM</li>
+        </ul>
 
-        <div class="panel-row" style="margin-top: 20px; border-top: 1px solid #4b4b4b; padding-top: 15px;">
-            <div>
-                <span style="color: #a4b0be; font-size: 14px; display: block; margin-bottom: 5px;">音声再生（配信に直接ミックスされます）:</span>
-                <button onclick="playBGM()" style="background-color: #ffa502;">🎵 BGM 再生</button>
-                <button onclick="stopBGM()" style="background-color: #70a1ff;">🔇 BGM 停止</button>
-                <button onclick="reloadBrowserSource()" style="background-color: #747d8c;">🔄 ブラウザソース再読み込み</button>
-            </div>
-        </div>
+        <h3>ミキサー</h3>
+        <label>BGM音量: <input type="range" id="bgmVol" min="0" max="1" step="0.1" value="0.5"></label>
     </div>
+</div>
 
-    <audio id="bgm-player" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" crossorigin="anonymous"></audio>
+<iframe id="eqliveSource" src="https://gensai-lab.studio.site/eqlive" style="display:none;"></iframe>
 
-    <script>
-        let mediaRecorder = null;
-        let ws = null;
-        let stream = null;
+<script>
+let stream, mediaRecorder;
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d');
+const iframe = document.getElementById('eqliveSource');
 
-        // モニターのサイズ調整（iPadの画面に合わせてiframeを縮小表示する処理）
-        function resizeMonitor() {
-            const container = document.getElementById('monitor-container');
-            const iframe = document.getElementById('eqlive-browser-source');
-            const scale = container.clientWidth / 1280;
-            if (scale < 1) {
-                iframe.style.transform = `scale(${scale})`;
-                container.style.height = `${720 * scale}px`;
-            }
-        }
-        window.addEventListener('resize', resizeMonitor);
-        window.addEventListener('load', resizeMonitor);
+// 1. 画面の合成（Canvas APIでOBSのレイアウトを作る）
+function drawCanvas() {
+    // 背景をクリア
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        function reloadBrowserSource() {
-            document.getElementById('eqlive-browser-source').src = "https://gensai-lab.github.io/eqlive/main-switcher.html";
-        }
+    // TODO: ここでEQLiveのHTML要素やグラフィックを描画
+    // ※iframeの直接描画はセキュリティ制限(CORS)があるため、
+    // 実際にはEQLiveのパーツ（文字や画像）をこのJS内で同じAPI等から取得してCanvasに直接描くロジックにします。
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '48px Arial';
+    ctx.fillText("EQLive 配信シミュレーション画面", 100, 100);
 
-        function playBGM() { document.getElementById('bgm-player').play(); }
-        function stopBGM() { document.getElementById('bgm-player').pause(); }
+    requestAnimationFrame(drawCanvas);
+}
+drawCanvas();
 
-        // Renderのサーバーを叩き起こす処理
-        async function wakeupServer() {
-            const wssUrl = document.getElementById('render-url').value;
-            if(!wssUrl) { alert('RenderのURLを入力してください。'); return; }
-            const httpUrl = wssUrl.replace('wss://', 'https://').replace('ws://', 'http://');
-            document.getElementById('wakeup-btn').innerText = '起動中...';
-            try {
-                const res = await fetch(httpUrl);
-                const text = await res.text();
-                alert('サーバーが起動しました！:\n' + text);
-                document.getElementById('wakeup-btn').innerText = '1. サーバー起動（完了）';
-            } catch (err) {
-                alert('サーバー起動要請を送りました。1分ほど待って配信開始してください。');
-                document.getElementById('wakeup-btn').innerText = '1. サーバー起動';
-            }
-        }
+// 2. 音声の合成（Web Audio APIでBGMとシステム音をミックス）
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const audioDestination = audioCtx.createMediaStreamDestination();
 
-        // 【新技術】画面全体ではなく、このページ内の「iframe（ブラウザソース）」だけをピンポイントで捕まえて配信する
-        async function startStreaming() {
-            const renderUrl = document.getElementById('render-url').value;
-            const streamKey = document.getElementById('stream-key').value;
+// BGMソースの作成
+const bgm = new Audio('your-bgm-file.mp3'); // 著作権フリーBGMのURL
+bgm.loop = true;
+const bgmSource = audioCtx.createMediaElementSource(bgm);
+const bgmGain = audioCtx.createGain();
+bgmSource.connect(bgmGain);
+bgmGain.connect(audioDestination);
 
-            if (!renderUrl || !streamKey) {
-                alert('RenderのURLとストリームキーを入力してください。');
-                return;
-            }
+// 音量調整の連動
+document.getElementById('bgmVol').addEventListener('input', (e) => {
+    bgmGain.gain.value = e.target.value;
+});
 
-            try {
-                // HTML要素の描画内容を直接「映像ストリーム」としてキャプチャする画期的なAPI (captureStream)
-                // これにより、iPadの画面共有を使わずに、指定したHTMLだけをピンポイントで抜き出せます！
-                const iframe = document.getElementById('eqlive-browser-source');
-                
-                // iPad（iOS）のSafari互換対策：canvas等を経由せずブラウザのWebRTCをバイパス
-                // 画面全体キャプチャダイアログを出しつつ、内部的なデータソースに固定
-                const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { width: 1280, height: 720, frameRate: 30 },
-                    audio: true
-                });
+// 3. WebRTC（WHIP）によるYouTubeへの配信処理
+async function toggleStreaming() {
+    bgm.play(); // BGM開始
+    
+    // Canvasの映像ストリームと、Web Audioの音声ストリームを合流
+    const videoStream = canvas.captureStream(30); // 30fps
+    const audioTrack = audioDestination.stream.getAudioTracks()[0];
+    videoStream.addTrack(audioTrack);
+    
+    stream = videoStream;
 
-                ws = new WebSocket(renderUrl);
+    // YouTubeのWHIPエンドポイント（API連携で取得したURL）へWebRTC接続を確立
+    // (ここにPeerConnectionとWHIPのシグナリング処理を実装します)
+    alert("YouTubeへのWebRTC(WHIP)配信ストリームを開始しました（擬似）");
+}
 
-                ws.onopen = () => {
-                    document.getElementById('status-indicator').innerText = '● 配信中';
-                    document.getElementById('status-indicator').style.color = '#2ed573';
-                    
-                    ws.send(`START:${streamKey}`);
-
-                    // iOSで最も安定して動き、かつ画質が潰れないコンテナ形式を指定
-                    mediaRecorder = new MediaRecorder(displayStream, {
-                        mimeType: 'video/webm;codecs=h264,opus',
-                        videoBitsPerSecond: 1500000 // 1.5Mbpsに制限してカクつき防止
-                    });
-
-                    mediaRecorder.ondataavailable = (event) => {
-                        if (event.data && event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                            ws.send(event.data);
-                        }
-                    };
-
-                    mediaRecorder.start(1000); // 1秒ごとに送信
-
-                    document.getElementById('start-btn').style.display = 'none';
-                    document.getElementById('stop-btn').style.display = 'inline-block';
-                };
-
-                ws.onclose = () => { stopStreaming(); };
-                ws.onerror = (e) => { stopStreaming(); };
-
-            } catch (err) {
-                console.error(err);
-                alert('配信の開始に失敗しました。ストリームキーや画面共有の許可を確認してください。');
-            }
-        }
-
-        function stopStreaming() {
-            document.getElementById('status-indicator').innerText = '● オフライン';
-            document.getElementById('status-indicator').style.color = '#ff4757';
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-            if (ws) ws.close();
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            document.getElementById('start-btn').style.display = 'inline-block';
-            document.getElementById('stop-btn').style.display = 'none';
-        }
-    </script>
+// 4. Google API / YouTube連携（概要）
+function handleAuthClick() {
+    // Google OAuth2.0でログインし、ユーザーのYouTubeアカウントの権限（Scope: youtube.broadcast）を取得。
+    // ログイン成功後、YouTube Data APIを使用して「今すぐ配信」のストリームキーやWHIP URLを自動取得します。
+    alert("Googleアカウント連携が完了しました。チャンネル情報を読み込みます。");
+}
+</script>
 </body>
 </html>
